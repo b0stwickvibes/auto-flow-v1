@@ -20,6 +20,20 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface MacroListeners {
+  handleClick: (e: MouseEvent) => void;
+  handleInput: (e: Event) => void;
+  handleKeyPress: (e: KeyboardEvent) => void;
+}
+
+interface WindowWithAutoFlow extends Window {
+  autoFlowParentOrigin?: string;
+}
+
+interface WindowWithMacroRecorder extends Window {
+  macroListeners?: MacroListeners;
+}
+
 interface MacroAction {
   id: string;
   timestamp: number;
@@ -531,8 +545,8 @@ const { chromium } = require('playwright');
             newWindow.document.head.appendChild(scriptElement);
             
             // Also set up a backup injection on navigation
-            (newWindow as any).autoFlowParentOrigin = window.location.origin;
-            (newWindow as any).addEventListener('beforeunload', () => {
+            (newWindow as WindowWithAutoFlow).autoFlowParentOrigin = window.location.origin;
+            (newWindow as WindowWithAutoFlow).addEventListener('beforeunload', () => {
               setTimeout(() => {
                 if (!newWindow.closed && newWindow.document) {
                   try {
@@ -641,7 +655,7 @@ const { chromium } = require('playwright');
     document.addEventListener('keydown', handleKeyPress, true);
 
     // Store listeners for cleanup
-    (window as any).macroListeners = { handleClick, handleInput, handleKeyPress };
+    (window as WindowWithMacroRecorder).macroListeners = { handleClick, handleInput, handleKeyPress };
     
     toast({
       title: "Recording Started",
@@ -653,12 +667,12 @@ const { chromium } = require('playwright');
     setIsRecording(false);
     
     // Remove event listeners
-    const listeners = (window as any).macroListeners;
+    const listeners = (window as WindowWithMacroRecorder).macroListeners;
     if (listeners) {
       document.removeEventListener('click', listeners.handleClick, true);
       document.removeEventListener('input', listeners.handleInput, true);
       document.removeEventListener('keydown', listeners.handleKeyPress, true);
-      delete (window as any).macroListeners;
+      delete (window as WindowWithMacroRecorder).macroListeners;
     }
     
     // Close external window if open
@@ -769,72 +783,60 @@ ${scripts}
 
   const getActionColor = (type: string) => {
     switch (type) {
-      case 'click': return 'text-blue-400';
-      case 'input': return 'text-green-400';
-      case 'navigation': return 'text-purple-400';
-      default: return 'text-gray-400';
+      case 'click': return 'text-primary-foreground';
+      case 'input': return 'text-primary-foreground';
+      case 'navigation': return 'text-primary-foreground';
+      default: return 'text-primary-foreground';
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Macro Recorder</h1>
-              <p className="text-muted-foreground">Record interactions and generate automation scripts</p>
+      {/* Enhanced Header */}
+      <header className="border-b border-border bg-glass/50 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">Macro Recorder</h1>
+              <p className="text-muted-foreground mt-1">Record interactions and generate automation scripts</p>
             </div>
-            <div className="flex items-center space-x-3">
-              <input
-                type="url"
-                placeholder="Enter website URL to record..."
-                value={recordingUrl}
-                onChange={(e) => setRecordingUrl(e.target.value)}
-                className="px-3 py-2 bg-muted border border-border rounded-lg text-foreground flex-1 min-w-64"
-              />
-              {actions.length > 0 && (
-                <>
-                  <Button variant="outline" onClick={() => setShowPreview(!showPreview)}>
-                    {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    {showPreview ? 'Hide' : 'Show'} Script
-                  </Button>
-                  <Button variant="outline" onClick={copyScript}>
-                    <Copy className="w-4 h-4" />
-                    Copy Script
-                  </Button>
-                  <Button variant="outline" onClick={downloadScript}>
-                    <Download className="w-4 h-4" />
-                    Download
-                  </Button>
-                  <Button variant="outline" onClick={clearActions}>
-                    <Trash2 className="w-4 h-4" />
-                    Clear
-                  </Button>
-                </>
-              )}
-              <Button 
-                variant="outline"
-                onClick={openExternalRecording}
-                disabled={!recordingUrl}
-              >
-                <ExternalLink className="w-4 h-4" />
-                Record External
-              </Button>
+            
+            {/* Enhanced Recording Controls */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="url"
+                  placeholder="Enter website URL to record..."
+                  value={recordingUrl}
+                  onChange={(e) => setRecordingUrl(e.target.value)}
+                  className="px-4 py-2 bg-glass border border-glass rounded-xl text-foreground backdrop-blur-md min-w-72 focus:ring-2 focus:ring-primary focus:border-primary/50 transition-all"
+                />
+                <Button 
+                  variant="glass"
+                  onClick={openExternalRecording}
+                  disabled={!recordingUrl}
+                  className="whitespace-nowrap"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Record External
+                </Button>
+              </div>
+              
+              {/* Prominent Recording Button */}
               <Button 
                 variant={isRecording ? "destructive" : "glow"}
                 onClick={isRecording ? stopRecording : startRecording}
-                className="min-w-32"
+                size="lg"
+                className="min-w-44 shadow-glow"
               >
                 {isRecording ? (
                   <>
-                    <Square className="w-4 h-4" />
+                    <Square className="w-5 h-5" />
                     Stop Recording
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4" />
+                    <Play className="w-5 h-5" />
                     Start Recording
                   </>
                 )}
@@ -845,25 +847,63 @@ ${scripts}
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Bookmarklet Section */}
-            <Card className="shadow-card border-primary/20">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Main Content - 3 columns */}
+          <div className="xl:col-span-3 space-y-8">
+            {/* Recording Status - More Prominent */}
+            <Card className={`shadow-card border-2 transition-all duration-300 ${
+              isRecording 
+                ? 'border-red-400 bg-red-400/5 shadow-glow' 
+                : 'border-glass bg-glass/30'
+            }`}>
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <div className={`w-6 h-6 rounded-full ${
+                      isRecording 
+                        ? 'bg-red-400 animate-pulse shadow-glow' 
+                        : 'bg-gray-400'
+                    }`} />
+                    <div>
+                      <h2 className="text-2xl font-bold text-foreground">
+                        {isRecording ? 'Recording in Progress' : 'Ready to Record'}
+                      </h2>
+                      <p className="text-muted-foreground mt-1">
+                        {isRecording 
+                          ? `${actions.length} actions captured`
+                          : 'Click "Start Recording" to begin capturing interactions'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={isRecording ? "destructive" : "secondary"} 
+                    className="text-lg px-4 py-2"
+                  >
+                    {isRecording ? 'LIVE' : 'IDLE'}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Bookmarklet Section */}
+            <Card className="shadow-card hover:shadow-glow transition-all duration-300 border-primary/20">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Globe className="w-5 h-5 text-primary" />
+                <CardTitle className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-primary rounded-xl flex items-center justify-center shadow-card">
+                    <Globe className="w-5 h-5 text-primary-foreground" />
+                  </div>
                   <span>Universal Recording Bookmarklet</span>
                 </CardTitle>
                 <CardDescription>
                   Drag this bookmarklet to your bookmarks bar to record on any website
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-medium text-foreground">AutoFlow Recorder</span>
-                    <Button variant="outline" size="sm" onClick={() => {
+              <CardContent className="space-y-6">
+                <div className="p-6 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="font-semibold text-foreground">AutoFlow Recorder</span>
+                    <Button variant="glass" size="sm" onClick={() => {
                       navigator.clipboard.writeText(generateBookmarklet());
                       toast({
                         title: "Bookmarklet Copied",
@@ -875,7 +915,9 @@ ${scripts}
                     </Button>
                   </div>
                   <Button 
-                    className="inline-flex items-center space-x-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+                    variant="glow"
+                    size="lg"
+                    className="w-full mb-4"
                     onClick={() => {
                       const bookmarkletCode = generateBookmarklet();
                       navigator.clipboard.writeText(bookmarkletCode);
@@ -885,40 +927,41 @@ ${scripts}
                       });
                     }}
                   >
-                    <Code className="w-4 h-4" />
+                    <Code className="w-5 h-5" />
                     <span>Get AutoFlow Recorder</span>
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-sm text-muted-foreground text-center leading-relaxed">
                     Drag this button to your bookmarks bar, then click it on any website to start recording interactions
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Recording Status */}
-            <Card className="shadow-card">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-4 h-4 rounded-full ${isRecording ? 'bg-red-400 animate-pulse' : 'bg-gray-400'}`} />
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {isRecording ? 'Recording in Progress' : 'Ready to Record'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {isRecording 
-                          ? `${actions.length} actions captured`
-                          : 'Click "Start Recording" to begin capturing interactions'
-                        }
-                      </p>
-                    </div>
+            {/* Action Controls */}
+            {actions.length > 0 && (
+              <Card className="shadow-card">
+                <CardContent className="p-6">
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="glass" onClick={() => setShowPreview(!showPreview)}>
+                      {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPreview ? 'Hide' : 'Show'} Script
+                    </Button>
+                    <Button variant="glass" onClick={copyScript}>
+                      <Copy className="w-4 h-4" />
+                      Copy Script
+                    </Button>
+                    <Button variant="glass" onClick={downloadScript}>
+                      <Download className="w-4 h-4" />
+                      Download
+                    </Button>
+                    <Button variant="destructive" onClick={clearActions}>
+                      <Trash2 className="w-4 h-4" />
+                      Clear All
+                    </Button>
                   </div>
-                  <Badge variant={isRecording ? "destructive" : "secondary"}>
-                    {isRecording ? 'LIVE' : 'IDLE'}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Script Preview */}
             {showPreview && actions.length > 0 && (
@@ -930,53 +973,66 @@ ${scripts}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <pre className="bg-muted/30 p-4 rounded-lg text-sm overflow-auto max-h-96 text-foreground">
+                  <pre className="bg-glass border border-glass rounded-xl p-6 text-sm overflow-auto max-h-96 text-foreground backdrop-blur-md">
                     {generateScript()}
                   </pre>
                 </CardContent>
               </Card>
             )}
 
-            {/* Actions List */}
-            <Card className="shadow-card">
+            {/* Enhanced Actions List */}
+            <Card className="shadow-card hover:shadow-glow transition-all duration-300">
               <CardHeader>
-                <CardTitle>Recorded Actions ({actions.length})</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Recorded Actions ({actions.length})</span>
+                  {actions.length > 0 && (
+                    <Badge variant="outline" className="px-3 py-1">
+                      {actions.length} captured
+                    </Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
                   Sequence of captured user interactions
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {actions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MousePointer className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No actions recorded yet</p>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <div className="w-20 h-20 bg-glass border border-glass rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                      <MousePointer className="w-10 h-10 opacity-50" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No actions recorded yet</h3>
                     <p className="text-sm">Start recording to capture your interactions</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-96 overflow-auto">
+                  <div className="space-y-3 max-h-96 overflow-auto">
                     {actions.map((action, index) => (
-                      <div key={action.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border">
-                        <div className="flex items-center space-x-3">
-                          <span className="text-xs text-muted-foreground w-8">#{index + 1}</span>
-                          <div className={`${getActionColor(action.type)}`}>
-                            {getActionIcon(action.type)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground capitalize">
-                              {action.type} {action.element && `on ${action.element}`}
-                            </p>
-                            {action.value && (
-                              <p className="text-xs text-muted-foreground">Value: {action.value}</p>
-                            )}
-                            {action.coordinates && (
-                              <p className="text-xs text-muted-foreground">
-                                Position: ({action.coordinates.x}, {action.coordinates.y})
+                      <div key={action.id} className="group p-4 bg-glass border border-glass rounded-xl backdrop-blur-md hover:shadow-card hover:border-primary/30 transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <span className="text-xs text-muted-foreground w-8 flex-shrink-0 font-mono">
+                              #{(index + 1).toString().padStart(2, '0')}
+                            </span>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getActionColor(action.type)} bg-gradient-primary shadow-card`}>
+                              {getActionIcon(action.type)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-semibold text-foreground capitalize group-hover:text-primary transition-colors">
+                                {action.type} {action.element && `on ${action.element}`}
                               </p>
-                            )}
+                              {action.value && (
+                                <p className="text-sm text-muted-foreground mt-1">Value: {action.value}</p>
+                              )}
+                              {action.coordinates && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: ({action.coordinates.x}, {action.coordinates.y})
+                                </p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          +{Math.round(action.timestamp / 1000)}s
+                          <div className="text-sm text-muted-foreground font-mono">
+                            +{Math.round(action.timestamp / 1000)}s
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -986,96 +1042,107 @@ ${scripts}
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Instructions */}
-            <Card className="shadow-card">
+          {/* Enhanced Sidebar */}
+          <div className="xl:col-span-1 space-y-6">
+            {/* Visual Session Stats */}
+            <Card className="shadow-card hover:shadow-glow transition-all duration-300">
               <CardHeader>
-                <CardTitle>Recording Methods</CardTitle>
+                <CardTitle className="flex items-center space-x-2">
+                  <Timer className="w-5 h-5 text-primary" />
+                  <span>Session Stats</span>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 text-sm text-muted-foreground">
-                <div className="space-y-3">
-                  <div className="flex items-start space-x-2">
-                    <span className="w-6 h-6 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">1</span>
-                    <div>
-                      <p className="font-medium text-foreground">Current Page Recording</p>
-                      <p>Click "Start Recording" to record interactions on this page</p>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                    <div className="text-2xl font-bold text-foreground">
+                      {actions.length > 0 ? 
+                        new Set(actions.map(a => a.url || window.location.href)).size : 0}
                     </div>
+                    <div className="text-xs text-muted-foreground mt-1">Websites</div>
                   </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="w-6 h-6 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">2</span>
-                    <div>
-                      <p className="font-medium text-foreground">External Website</p>
-                      <p>Enter a URL and click "Record External" to open in new window</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="w-6 h-6 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">3</span>
-                    <div>
-                      <p className="font-medium text-foreground">Universal Bookmarklet</p>
-                      <p>Use the bookmarklet above for maximum compatibility across all websites</p>
-                    </div>
+                  <div className="text-center p-4 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                    <div className="text-2xl font-bold text-foreground">{actions.length}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Actions</div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Instructions */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>How to Use</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <div className="flex items-start space-x-2">
-                  <span className="w-5 h-5 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">1</span>
-                  <p>Click "Start Recording" to begin capturing your interactions</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="w-5 h-5 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">2</span>
-                  <p>Interact with the page normally - clicks, inputs, and keystrokes will be recorded</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="w-5 h-5 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">3</span>
-                  <p>Press ESC or click "Stop Recording" when finished</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <span className="w-5 h-5 bg-primary text-primary-foreground rounded text-xs flex items-center justify-center mt-0.5 font-bold">4</span>
-                  <p>Generate and download your automation script</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Stats */}
-            <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle>Session Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Websites Recorded:</span>
-                  <span className="font-semibold text-foreground">
-                    {actions.length > 0 ? 
-                      new Set(actions.map(a => a.url || window.location.href)).size : 0}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Actions:</span>
-                  <span className="font-semibold text-foreground">{actions.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Recording Time:</span>
-                  <span className="font-semibold text-foreground">
+                
+                <div className="text-center p-4 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <div className="text-3xl font-bold text-foreground">
                     {startTime && isRecording 
                       ? `${Math.round((Date.now() - startTime) / 1000)}s`
                       : '0s'
                     }
-                  </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">Recording Time</div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge variant={isRecording ? "destructive" : "secondary"}>
+                
+                <div className="flex items-center justify-center p-4 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <Badge 
+                    variant={isRecording ? "destructive" : "secondary"}
+                    className="px-4 py-2 text-sm"
+                  >
                     {isRecording ? 'Recording' : 'Stopped'}
                   </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Simplified Instructions */}
+            <Card className="shadow-card hover:shadow-glow transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Navigation className="w-5 h-5 text-primary" />
+                  <span>Quick Guide</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start space-x-3 p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                    <span className="w-6 h-6 bg-gradient-primary text-primary-foreground rounded-full text-xs flex items-center justify-center flex-shrink-0 font-bold">1</span>
+                    <div>
+                      <p className="font-medium text-foreground">Start Recording</p>
+                      <p className="text-muted-foreground text-xs">Click the recording button above</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                    <span className="w-6 h-6 bg-gradient-primary text-primary-foreground rounded-full text-xs flex items-center justify-center flex-shrink-0 font-bold">2</span>
+                    <div>
+                      <p className="font-medium text-foreground">Interact Normally</p>
+                      <p className="text-muted-foreground text-xs">All clicks and inputs are captured</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                    <span className="w-6 h-6 bg-gradient-primary text-primary-foreground rounded-full text-xs flex items-center justify-center flex-shrink-0 font-bold">3</span>
+                    <div>
+                      <p className="font-medium text-foreground">Stop & Export</p>
+                      <p className="text-muted-foreground text-xs">Press ESC or stop button when done</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recording Methods */}
+            <Card className="shadow-card hover:shadow-glow transition-all duration-300">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Globe className="w-5 h-5 text-primary" />
+                  <span>Recording Options</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <p className="font-medium text-foreground mb-1">Current Page</p>
+                  <p className="text-muted-foreground text-xs">Record interactions on this page</p>
+                </div>
+                <div className="p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <p className="font-medium text-foreground mb-1">External Website</p>
+                  <p className="text-muted-foreground text-xs">Enter URL to record in new window</p>
+                </div>
+                <div className="p-3 bg-glass border border-glass rounded-xl backdrop-blur-md">
+                  <p className="font-medium text-foreground mb-1">Universal Bookmarklet</p>
+                  <p className="text-muted-foreground text-xs">Use on any website via bookmark</p>
                 </div>
               </CardContent>
             </Card>
