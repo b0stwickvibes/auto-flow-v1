@@ -97,15 +97,12 @@ const HeroSection = () => {
           </div>
 
           <div className="relative">
-            <div className="relative bg-glass border border-glass rounded-2xl p-8 backdrop-blur-md shadow-card">
+            <div className="relative bg-glass border border-glass rounded-2xl p-6 backdrop-blur-md shadow-card hover:shadow-glow transition-all duration-500">
               <img 
                 src={heroImage} 
                 alt="Automation Platform Dashboard" 
                 className="w-full h-auto rounded-xl shadow-primary"
               />
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-primary rounded-xl flex items-center justify-center shadow-glow">
-                <Zap className="w-12 h-12 text-primary-foreground" />
-              </div>
             </div>
           </div>
         </div>
@@ -113,30 +110,54 @@ const HeroSection = () => {
         {/* Features Grid */}
         <div className="mt-32 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
-            <div key={index} className="group text-center space-y-4">
-              <div className="w-16 h-16 bg-glass border border-glass rounded-2xl flex items-center justify-center mx-auto backdrop-blur-md group-hover:shadow-glow transition-all duration-300">
-                <feature.icon className="w-8 h-8 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-foreground">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
+            <div key={index} className="group cursor-pointer">
+              <div className="h-full bg-glass border border-glass rounded-2xl p-6 backdrop-blur-md hover:shadow-glow hover:border-primary/30 transition-all duration-500 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-card group-hover:shadow-glow group-hover:scale-110 transition-all duration-300">
+                    <feature.icon className="w-8 h-8 text-primary-foreground" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">{feature.title}</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
         {/* CTA Section */}
-        <div className="mt-32 text-center bg-glass border border-glass rounded-3xl p-12 backdrop-blur-md">
-          <h2 className="text-3xl font-bold text-foreground mb-4">
-            Ready to automate your workflow?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of professionals who save hours every week with intelligent automation.
-          </p>
-          <Button variant="glow" size="lg" className="group">
-            Get Started Now
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </Button>
+        <div className="mt-32 relative">
+          <div className="text-center bg-glass border border-glass rounded-3xl p-12 backdrop-blur-md hover:shadow-glow transition-all duration-500 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-32 bg-primary/10 rounded-full blur-3xl" />
+            
+            <div className="relative z-10">
+              <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                Ready to automate your workflow?
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+                Join thousands of professionals who save hours every week with intelligent automation.
+              </p>
+              
+              {/* Social proof indicators */}
+              <div className="flex items-center justify-center space-x-8 mb-8 text-sm text-muted-foreground">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                  <span>5,000+ workflows created</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                  <span>100+ hours saved daily</span>
+                </div>
+              </div>
+              
+              <Button variant="glow" size="lg" className="group">
+                Get Started Now
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
