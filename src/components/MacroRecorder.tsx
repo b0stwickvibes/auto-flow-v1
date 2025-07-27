@@ -343,7 +343,12 @@ const { chromium } = require('playwright');
     document.addEventListener('keydown', handleKeyPress, true);
 
     // Store listeners for cleanup
-    (window as any).macroListeners = { handleClick, handleInput, handleKeyPress };
+    interface MacroListeners {
+      handleClick: (e: MouseEvent) => void;
+      handleInput: (e: Event) => void;
+      handleKeyPress: (e: KeyboardEvent) => void;
+    }
+    (window as Window & { macroListeners?: MacroListeners }).macroListeners = { handleClick, handleInput, handleKeyPress };
     
     toast({
       title: "Recording Started",
@@ -355,12 +360,12 @@ const { chromium } = require('playwright');
     setIsRecording(false);
     
     // Remove event listeners
-    const listeners = (window as any).macroListeners;
+    const listeners = (window as Window & { macroListeners?: MacroListeners }).macroListeners;
     if (listeners) {
       document.removeEventListener('click', listeners.handleClick, true);
       document.removeEventListener('input', listeners.handleInput, true);
       document.removeEventListener('keydown', listeners.handleKeyPress, true);
-      delete (window as any).macroListeners;
+      delete (window as Window & { macroListeners?: MacroListeners }).macroListeners;
     }
     
     // Close external window if open
