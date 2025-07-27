@@ -65,7 +65,7 @@ const Dashboard = () => {
     setExecutionModal({ isOpen: true, workflow });
   };
 
-  const handleExecutionComplete = (result: any) => {
+  const handleExecutionComplete = (result: unknown) => {
     // Refresh workflows to update last run time
     loadWorkflows();
   };
