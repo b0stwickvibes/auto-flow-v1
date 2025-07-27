@@ -531,8 +531,8 @@ const { chromium } = require('playwright');
             newWindow.document.head.appendChild(scriptElement);
             
             // Also set up a backup injection on navigation
-            (newWindow as any).autoFlowParentOrigin = window.location.origin;
-            (newWindow as any).addEventListener('beforeunload', () => {
+            (newWindow as Window & { autoFlowParentOrigin?: string }).autoFlowParentOrigin = window.location.origin;
+            newWindow.addEventListener('beforeunload', () => {
               setTimeout(() => {
                 if (!newWindow.closed && newWindow.document) {
                   try {
@@ -641,7 +641,7 @@ const { chromium } = require('playwright');
     document.addEventListener('keydown', handleKeyPress, true);
 
     // Store listeners for cleanup
-    (window as any).macroListeners = { handleClick, handleInput, handleKeyPress };
+    (window as Window & { macroListeners?: Record<string, EventListener> }).macroListeners = { handleClick, handleInput, handleKeyPress };
     
     toast({
       title: "Recording Started",
@@ -653,12 +653,12 @@ const { chromium } = require('playwright');
     setIsRecording(false);
     
     // Remove event listeners
-    const listeners = (window as any).macroListeners;
+    const listeners = (window as Window & { macroListeners?: Record<string, EventListener> }).macroListeners;
     if (listeners) {
       document.removeEventListener('click', listeners.handleClick, true);
       document.removeEventListener('input', listeners.handleInput, true);
       document.removeEventListener('keydown', listeners.handleKeyPress, true);
-      delete (window as any).macroListeners;
+      delete (window as Window & { macroListeners?: Record<string, EventListener> }).macroListeners;
     }
     
     // Close external window if open

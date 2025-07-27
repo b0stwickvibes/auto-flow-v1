@@ -80,8 +80,10 @@ const Dashboard = () => {
                 <Settings className="w-5 h-5" />
               </Button>
               <Button variant="glow">
-                <Plus className="w-4 h-4" />
-                New Workflow
+                <a href="/builder" className="flex items-center">
+                  <Plus className="w-4 h-4" />
+                  New Workflow
+                </a>
               </Button>
             </div>
           </div>
