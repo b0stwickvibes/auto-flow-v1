@@ -2,6 +2,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Play, 
   Square, 
@@ -16,9 +20,12 @@ import {
   Timer,
   ExternalLink,
   Code,
-  Globe
+  Globe,
+  Save,
+  Workflow
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import WorkflowService from '../services/workflowService';
 
 interface MacroAction {
   id: string;
@@ -40,9 +47,14 @@ const MacroRecorder = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState<string>('');
   const [externalWindow, setExternalWindow] = useState<Window | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [workflowName, setWorkflowName] = useState('');
+  const [workflowDescription, setWorkflowDescription] = useState('');
   const { toast } = useToast();
   const actionIdCounter = useRef(0);
   const messageHandler = useRef<((event: MessageEvent) => void) | null>(null);
+  
+  const workflowService = WorkflowService.getInstance();
 
   const generateActionId = () => `action_${++actionIdCounter.current}`;
 
@@ -758,6 +770,56 @@ ${scripts}
     });
   };
 
+  const handleSaveWorkflow = () => {
+    if (actions.length === 0) {
+      toast({
+        title: "No Actions",
+        description: "Record some actions before saving as a workflow",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowSaveDialog(true);
+  };
+
+  const saveWorkflow = () => {
+    if (!workflowName.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter a name for your workflow",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const workflow = workflowService.createWorkflow(
+        workflowName.trim(),
+        workflowDescription.trim() || `Recorded workflow with ${actions.length} actions`,
+        actions
+      );
+
+      toast({
+        title: "Workflow Saved",
+        description: `"${workflow.name}" has been saved successfully`,
+      });
+
+      setShowSaveDialog(false);
+      setWorkflowName('');
+      setWorkflowDescription('');
+      
+      // Optionally clear actions after saving
+      // setActions([]);
+      
+    } catch (error) {
+      toast({
+        title: "Save Failed",
+        description: "Failed to save workflow. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'click': return <MousePointer className="w-4 h-4" />;
@@ -807,6 +869,10 @@ ${scripts}
                   <Button variant="outline" onClick={downloadScript}>
                     <Download className="w-4 h-4" />
                     Download
+                  </Button>
+                  <Button variant="outline" onClick={handleSaveWorkflow}>
+                    <Save className="w-4 h-4" />
+                    Save Workflow
                   </Button>
                   <Button variant="outline" onClick={clearActions}>
                     <Trash2 className="w-4 h-4" />
@@ -1082,6 +1148,61 @@ ${scripts}
           </div>
         </div>
       </div>
+
+      {/* Save Workflow Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Workflow className="w-5 h-5" />
+              <span>Save as Workflow</span>
+            </DialogTitle>
+            <DialogDescription>
+              Save your recorded actions as a reusable workflow
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="workflow-name">Workflow Name</Label>
+              <Input
+                id="workflow-name"
+                placeholder="Enter workflow name..."
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="workflow-description">Description (Optional)</Label>
+              <Textarea
+                id="workflow-description"
+                placeholder="Describe what this workflow does..."
+                value={workflowDescription}
+                onChange={(e) => setWorkflowDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            <div className="bg-muted/30 p-3 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                This workflow will contain <strong>{actions.length} actions</strong> across{' '}
+                <strong>{new Set(actions.map(a => a.url || window.location.href)).size} website(s)</strong>
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="glow" onClick={saveWorkflow}>
+                <Save className="w-4 h-4 mr-2" />
+                Save Workflow
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
