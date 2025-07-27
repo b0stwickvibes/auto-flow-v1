@@ -56,8 +56,11 @@ const MacroRecorder = () => {
   }
   
   window.macroRecorderActive = true;
-  window.macroRecorderActions = [];
-  window.macroRecorderStartTime = Date.now();
+  window.macroRecorderActions = window.macroRecorderActions || [];
+  window.macroRecorderStartTime = window.macroRecorderStartTime || Date.now();
+  
+  // Store the script in window for re-injection
+  window.macroRecorderScript = arguments.callee.toString();
   
   // Create floating UI
   const recorderUI = document.createElement('div');
@@ -85,13 +88,47 @@ const MacroRecorder = () => {
       <strong>Recording Actions</strong>
       <button id="stop-recording" style="margin-left: auto; background: #ef4444; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Stop</button>
     </div>
-    <div id="action-count" style="color: #888; font-size: 12px;">0 actions captured</div>
+    <div id="action-count" style="color: #888; font-size: 12px;">\${window.macroRecorderActions.length} actions captured</div>
     <style>
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
   \`;
   
   document.body.appendChild(recorderUI);
+  
+  // Function to re-inject recorder on navigation
+  function reinjectRecorder() {
+    if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
+      setTimeout(() => {
+        eval('(' + window.macroRecorderScript + ')()');
+      }, 500);
+    }
+  }
+  
+  // Listen for navigation events
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function() {
+    originalPushState.apply(history, arguments);
+    reinjectRecorder();
+  };
+  
+  history.replaceState = function() {
+    originalReplaceState.apply(history, arguments);
+    reinjectRecorder();
+  };
+  
+  window.addEventListener('popstate', reinjectRecorder);
+  
+  // Watch for page changes with MutationObserver
+  const observer = new MutationObserver(() => {
+    if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
+      reinjectRecorder();
+    }
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
   
   // Enhanced selector generation
   function generateSelector(element) {
@@ -282,13 +319,35 @@ const { chromium } = require('playwright');
     const newWindow = window.open(url, '_blank', 'width=1200,height=800');
     if (newWindow) {
       setExternalWindow(newWindow);
-      // Note: Due to browser security restrictions, we can't inject scripts into external domains
-      // The user should use the bookmarklet method instead
-      toast({
-        title: "External Window Opened",
-        description: "Use the bookmarklet on that page to start recording",
-        variant: "default"
-      });
+      setIsRecording(true);
+      setStartTime(Date.now());
+      setActions([]);
+      
+      // Wait for the window to load then inject the bookmarklet
+      const checkLoaded = setInterval(() => {
+        try {
+          if (newWindow.document && newWindow.document.readyState === 'complete') {
+            clearInterval(checkLoaded);
+            // Auto-inject the bookmarklet script
+            (newWindow as any).eval(generateBookmarkletScript());
+            toast({
+              title: "Recording Started in External Window",
+              description: "AutoFlow recorder is now active on the external page",
+            });
+          }
+        } catch (e) {
+          // Cross-origin restrictions - fallback to manual bookmarklet
+          clearInterval(checkLoaded);
+          toast({
+            title: "External Window Opened",
+            description: "Use the bookmarklet on that page to start recording",
+            variant: "default"
+          });
+        }
+      }, 100);
+      
+      // Timeout after 5 seconds
+      setTimeout(() => clearInterval(checkLoaded), 5000);
     }
   };
 
@@ -343,12 +402,7 @@ const { chromium } = require('playwright');
     document.addEventListener('keydown', handleKeyPress, true);
 
     // Store listeners for cleanup
-    interface MacroListeners {
-      handleClick: (e: MouseEvent) => void;
-      handleInput: (e: Event) => void;
-      handleKeyPress: (e: KeyboardEvent) => void;
-    }
-    (window as Window & { macroListeners?: MacroListeners }).macroListeners = { handleClick, handleInput, handleKeyPress };
+    (window as any).macroListeners = { handleClick, handleInput, handleKeyPress };
     
     toast({
       title: "Recording Started",
@@ -360,12 +414,12 @@ const { chromium } = require('playwright');
     setIsRecording(false);
     
     // Remove event listeners
-    const listeners = (window as Window & { macroListeners?: MacroListeners }).macroListeners;
+    const listeners = (window as any).macroListeners;
     if (listeners) {
       document.removeEventListener('click', listeners.handleClick, true);
       document.removeEventListener('input', listeners.handleInput, true);
       document.removeEventListener('keydown', listeners.handleKeyPress, true);
-      delete (window as Window & { macroListeners?: MacroListeners }).macroListeners;
+      delete (window as any).macroListeners;
     }
     
     // Close external window if open
@@ -581,20 +635,20 @@ ${scripts}
                       Copy
                     </Button>
                   </div>
-                  <a 
-                    href={generateBookmarklet()}
-                    className="inline-flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-                    onClick={(e) => {
-                      e.preventDefault();
+                  <Button 
+                    className="inline-flex items-center space-x-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+                    onClick={() => {
+                      const bookmarkletCode = generateBookmarklet();
+                      navigator.clipboard.writeText(bookmarkletCode);
                       toast({
-                        title: "Drag to Bookmarks Bar",
-                        description: "Drag this button to your bookmarks bar, then click it on any website to start recording",
+                        title: "Bookmarklet Code Copied",
+                        description: "Create a new bookmark and paste this as the URL to use anywhere",
                       });
                     }}
                   >
                     <Code className="w-4 h-4" />
-                    <span>AutoFlow Recorder</span>
-                  </a>
+                    <span>Get AutoFlow Recorder</span>
+                  </Button>
                   <p className="text-xs text-muted-foreground mt-2">
                     Drag this button to your bookmarks bar, then click it on any website to start recording interactions
                   </p>
