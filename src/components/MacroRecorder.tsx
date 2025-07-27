@@ -51,8 +51,10 @@ const MacroRecorder = () => {
     return `
 (function() {
   if (window.macroRecorderActive) {
-    alert('Macro recorder is already active on this page!');
-    return;
+    if (document.getElementById('macro-recorder-ui')) {
+      alert('Macro recorder is already active on this page!');
+      return;
+    }
   }
   
   window.macroRecorderActive = true;
@@ -62,39 +64,102 @@ const MacroRecorder = () => {
   // Store the script in window for re-injection
   window.macroRecorderScript = arguments.callee.toString();
   
-  // Create floating UI
+  // Create floating draggable UI
   const recorderUI = document.createElement('div');
   recorderUI.id = 'macro-recorder-ui';
   recorderUI.style.cssText = \`
     position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #1a1a1a;
+    top: 80px;
+    left: 20px;
+    background: linear-gradient(135deg, rgba(26, 26, 26, 0.95), rgba(46, 46, 46, 0.95));
     color: white;
-    border: 1px solid #333;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
-    padding: 16px;
-    z-index: 10000;
+    padding: 12px 16px;
+    z-index: 999999;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 14px;
-    min-width: 280px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    backdrop-filter: blur(10px);
+    font-size: 13px;
+    width: 280px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+    backdrop-filter: blur(20px);
+    cursor: move;
+    user-select: none;
+    transition: transform 0.2s ease;
   \`;
   
   recorderUI.innerHTML = \`
-    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-      <div style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite;"></div>
-      <strong>Recording Actions</strong>
-      <button id="stop-recording" style="margin-left: auto; background: #ef4444; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Stop</button>
+    <div id="recorder-header" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: move;">
+      <div style="width: 6px; height: 6px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite;"></div>
+      <strong style="font-size: 12px;">AutoFlow Recorder</strong>
+      <div style="margin-left: auto; display: flex; gap: 4px;">
+        <button id="minimize-recorder" style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 11px;">−</button>
+        <button id="stop-recording" style="background: #ef4444; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Stop</button>
+      </div>
     </div>
-    <div id="action-count" style="color: #888; font-size: 12px;">\${window.macroRecorderActions.length} actions captured</div>
+    <div id="recorder-content">
+      <div id="action-count" style="color: #ccc; font-size: 11px; margin-bottom: 6px;">\${window.macroRecorderActions.length} actions captured</div>
+      <div style="font-size: 10px; color: #888; line-height: 1.3;">Recording all interactions. Click Stop when done.</div>
+    </div>
     <style>
-      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      #macro-recorder-ui:hover { transform: translateY(-1px); }
     </style>
   \`;
   
   document.body.appendChild(recorderUI);
+  
+  // Make UI draggable
+  let isDragging = false;
+  let currentX, currentY, initialX, initialY;
+  
+  function dragStart(e) {
+    if (e.target.id === 'stop-recording' || e.target.id === 'minimize-recorder') return;
+    initialX = e.clientX - recorderUI.offsetLeft;
+    initialY = e.clientY - recorderUI.offsetTop;
+    isDragging = true;
+    recorderUI.style.cursor = 'grabbing';
+  }
+  
+  function dragEnd() {
+    isDragging = false;
+    recorderUI.style.cursor = 'move';
+  }
+  
+  function drag(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    currentX = e.clientX - initialX;
+    currentY = e.clientY - initialY;
+    
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - recorderUI.offsetWidth;
+    const maxY = window.innerHeight - recorderUI.offsetHeight;
+    currentX = Math.max(0, Math.min(currentX, maxX));
+    currentY = Math.max(0, Math.min(currentY, maxY));
+    
+    recorderUI.style.left = currentX + 'px';
+    recorderUI.style.top = currentY + 'px';
+  }
+  
+  recorderUI.addEventListener('mousedown', dragStart);
+  document.addEventListener('mousemove', drag);
+  document.addEventListener('mouseup', dragEnd);
+  
+  // Minimize functionality
+  let isMinimized = false;
+  document.getElementById('minimize-recorder').addEventListener('click', () => {
+    const content = document.getElementById('recorder-content');
+    if (isMinimized) {
+      content.style.display = 'block';
+      recorderUI.style.width = '280px';
+      document.getElementById('minimize-recorder').textContent = '−';
+    } else {
+      content.style.display = 'none';
+      recorderUI.style.width = 'auto';
+      document.getElementById('minimize-recorder').textContent = '+';
+    }
+    isMinimized = !isMinimized;
+  });
   
   // Function to re-inject recorder on navigation
   function reinjectRecorder() {
@@ -208,26 +273,85 @@ const MacroRecorder = () => {
     document.removeEventListener('input', handleInput, true);
     document.removeEventListener('keydown', handleKeyPress, true);
     
-    // Send final results to parent window
+    const finalActions = window.macroRecorderActions || [];
+    const currentUrl = window.location.href;
+    
+    // Always try multiple methods to send data back
+    let dataSent = false;
+    
+    // Method 1: Try postMessage to all possible parent windows
     try {
-      window.parent.postMessage({
-        type: 'MACRO_COMPLETE',
-        actions: window.macroRecorderActions,
-        url: window.location.href
-      }, '*');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'MACRO_COMPLETE',
+          actions: finalActions,
+          url: currentUrl,
+          timestamp: Date.now()
+        }, '*');
+        dataSent = true;
+      }
+      
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({
+          type: 'MACRO_COMPLETE',
+          actions: finalActions,
+          url: currentUrl,
+          timestamp: Date.now()
+        }, '*');
+        dataSent = true;
+      }
+      
+      // Try to send to the AutoFlow origin if available
+      if (window.autoFlowParentOrigin) {
+        window.parent.postMessage({
+          type: 'MACRO_COMPLETE',
+          actions: finalActions,
+          url: currentUrl,
+          timestamp: Date.now()
+        }, window.autoFlowParentOrigin);
+        dataSent = true;
+      }
     } catch (e) {
-      // Download as fallback
-      const script = generatePlaywrightScript(window.macroRecorderActions);
+      console.log('Could not send via postMessage:', e);
+    }
+    
+    // Method 2: Save to localStorage as backup
+    try {
+      const savedRecordings = JSON.parse(localStorage.getItem('autoflow_recordings') || '[]');
+      savedRecordings.push({
+        id: 'recording_' + Date.now(),
+        timestamp: Date.now(),
+        url: currentUrl,
+        actions: finalActions,
+        duration: Math.round((Date.now() - window.macroRecorderStartTime) / 1000)
+      });
+      localStorage.setItem('autoflow_recordings', JSON.stringify(savedRecordings));
+      console.log('Recording saved to localStorage');
+    } catch (e) {
+      console.log('Could not save to localStorage:', e);
+    }
+    
+    // Method 3: Always offer download as final fallback
+    if (finalActions.length > 0) {
+      const script = generatePlaywrightScript(finalActions);
       const blob = new Blob([script], { type: 'text/javascript' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'recorded_macro_' + Date.now() + '.js';
-      a.click();
+      a.download = 'autoflow_recording_' + Date.now() + '.js';
+      
+      // Show user a notification about the download
+      if (confirm(\`Recording complete! \${finalActions.length} actions captured.\\n\\nClick OK to download the automation script, or Cancel to just close the recorder.\`)) {
+        a.click();
+      }
       URL.revokeObjectURL(url);
     }
     
     document.getElementById('macro-recorder-ui')?.remove();
+    
+    // Clear the recording data
+    window.macroRecorderActions = [];
+    delete window.macroRecorderStartTime;
   }
   
   function generatePlaywrightScript(actions) {
@@ -316,38 +440,92 @@ const { chromium } = require('playwright');
 
   const openExternalRecording = () => {
     const url = recordingUrl || 'https://example.com';
-    const newWindow = window.open(url, '_blank', 'width=1200,height=800');
+    const newWindow = window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
     if (newWindow) {
       setExternalWindow(newWindow);
       setIsRecording(true);
       setStartTime(Date.now());
       setActions([]);
       
-      // Wait for the window to load then inject the bookmarklet
-      const checkLoaded = setInterval(() => {
+      // Enhanced window handling to prevent disappearing recorder
+      let injectionAttempts = 0;
+      const maxAttempts = 10;
+      
+      const attemptInjection = () => {
+        injectionAttempts++;
         try {
+          if (newWindow.closed) {
+            clearInterval(checkLoaded);
+            setIsRecording(false);
+            setExternalWindow(null);
+            return;
+          }
+          
           if (newWindow.document && newWindow.document.readyState === 'complete') {
             clearInterval(checkLoaded);
-            // Auto-inject the bookmarklet script
-            (newWindow as any).eval(generateBookmarkletScript());
+            // Auto-inject the bookmarklet script with persistence
+            const script = generateBookmarkletScript();
+            const scriptElement = newWindow.document.createElement('script');
+            scriptElement.textContent = script;
+            newWindow.document.head.appendChild(scriptElement);
+            
+            // Also set up a backup injection on navigation
+            (newWindow as any).autoFlowParentOrigin = window.location.origin;
+            (newWindow as any).addEventListener('beforeunload', () => {
+              setTimeout(() => {
+                if (!newWindow.closed && newWindow.document) {
+                  try {
+                    const backupScript = newWindow.document.createElement('script');
+                    backupScript.textContent = script;
+                    newWindow.document.head.appendChild(backupScript);
+                  } catch (e) {
+                    console.log('Could not re-inject on navigation:', e);
+                  }
+                }
+              }, 100);
+            });
+            
             toast({
               title: "Recording Started in External Window",
-              description: "AutoFlow recorder is now active on the external page",
+              description: "AutoFlow recorder is now active. It will persist across page navigation.",
+            });
+          } else if (injectionAttempts >= maxAttempts) {
+            clearInterval(checkLoaded);
+            toast({
+              title: "External Window Opened",
+              description: "Use the bookmarklet button below to start recording manually",
+              variant: "default"
             });
           }
         } catch (e) {
-          // Cross-origin restrictions - fallback to manual bookmarklet
-          clearInterval(checkLoaded);
+          if (injectionAttempts >= maxAttempts) {
+            clearInterval(checkLoaded);
+            toast({
+              title: "External Window Opened", 
+              description: "Due to security restrictions, use the bookmarklet to start recording",
+              variant: "default"
+            });
+          }
+        }
+      };
+      
+      const checkLoaded = setInterval(attemptInjection, 200);
+      
+      // Cleanup after 30 seconds
+      setTimeout(() => clearInterval(checkLoaded), 30000);
+      
+      // Monitor window close
+      const checkClosed = setInterval(() => {
+        if (newWindow.closed) {
+          clearInterval(checkClosed);
+          setIsRecording(false);
+          setExternalWindow(null);
           toast({
-            title: "External Window Opened",
-            description: "Use the bookmarklet on that page to start recording",
-            variant: "default"
+            title: "External Window Closed",
+            description: "Recording session ended",
           });
         }
-      }, 100);
-      
-      // Timeout after 5 seconds
-      setTimeout(() => clearInterval(checkLoaded), 5000);
+      }, 1000);
     }
   };
 
