@@ -161,12 +161,23 @@ const MacroRecorder = () => {
     isMinimized = !isMinimized;
   });
   
-  // Function to re-inject recorder on navigation
+  // Enhanced function to re-inject recorder with AngularJS support
   function reinjectRecorder() {
     if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
       setTimeout(() => {
-        eval('(' + window.macroRecorderScript + ')()');
-      }, 500);
+        try {
+          eval('(' + window.macroRecorderScript + ')()');
+        } catch (e) {
+          console.log('Reinjection failed, retrying...', e);
+          setTimeout(() => {
+            try {
+              eval('(' + window.macroRecorderScript + ')()');
+            } catch (e2) {
+              console.log('Second reinjection attempt failed:', e2);
+            }
+          }, 1000);
+        }
+      }, 300);
     }
   }
   
@@ -221,6 +232,29 @@ const MacroRecorder = () => {
       }
     }, 100);
   }, true);
+  
+  // AngularJS specific handling (for MarginEdge and similar apps)
+  if (window.angular) {
+    console.log('AngularJS detected - setting up enhanced monitoring');
+    const rootScope = window.angular.element(document).scope();
+    if (rootScope && rootScope.$on) {
+      rootScope.$on('$routeChangeStart', reinjectRecorder);
+      rootScope.$on('$stateChangeStart', reinjectRecorder);
+      rootScope.$on('$locationChangeStart', reinjectRecorder);
+    }
+  }
+  
+  // Even more aggressive monitoring for AngularJS apps
+  const urgentCheck = setInterval(() => {
+    if (!window.macroRecorderActive) {
+      clearInterval(urgentCheck);
+      return;
+    }
+    if (!document.getElementById('macro-recorder-ui')) {
+      console.log('Recorder UI missing - emergency reinjection');
+      reinjectRecorder();
+    }
+  }, 250);
   
   // Enhanced selector generation
   function generateSelector(element) {
