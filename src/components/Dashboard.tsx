@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,52 +15,68 @@ import {
   Activity,
   Calendar,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
+import WorkflowService, { Workflow } from '../services/workflowService';
+import WorkflowExecutionModal from './WorkflowExecutionModal';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const workflows = [
-    {
-      id: 1,
-      name: "Gmail File Downloader",
-      description: "Automatically download attachments from specific senders",
-      status: "active",
-      lastRun: "2 minutes ago",
-      frequency: "Every 30 minutes",
-      services: ["Gmail", "Google Drive"]
-    },
-    {
-      id: 2,
-      name: "Repository Setup Generator",
-      description: "Generate terminal commands for project initialization",
-      status: "paused",
-      lastRun: "1 hour ago",
-      frequency: "Manual trigger",
-      services: ["GitHub", "Terminal"]
-    },
-    {
-      id: 3,
-      name: "Cloud Storage Organizer",
-      description: "Sort and organize files across cloud storage platforms",
-      status: "active",
-      lastRun: "15 minutes ago",
-      frequency: "Daily at 2 AM",
-      services: ["Google Drive", "Dropbox"]
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [executionModal, setExecutionModal] = useState<{
+    isOpen: boolean;
+    workflow: Workflow | null;
+  }>({ isOpen: false, workflow: null });
+  const { toast } = useToast();
+  
+  const workflowService = WorkflowService.getInstance();
+
+  useEffect(() => {
+    loadWorkflows();
+  }, []);
+
+  const loadWorkflows = () => {
+    const allWorkflows = workflowService.getAllWorkflows();
+    setWorkflows(allWorkflows);
+  };
+
+  const handleToggleWorkflow = (workflowId: string) => {
+    const updatedWorkflow = workflowService.toggleWorkflowStatus(workflowId);
+    if (updatedWorkflow) {
+      loadWorkflows();
+      toast({
+        title: "Workflow Updated",
+        description: `Workflow ${updatedWorkflow.status === 'active' ? 'activated' : 'paused'}`,
+      });
     }
-  ];
+  };
+
+  const handleExecuteWorkflow = (workflow: Workflow) => {
+    if (workflow.actions.length === 0) {
+      toast({
+        title: "No Actions",
+        description: "This workflow has no recorded actions to execute. Record some actions first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setExecutionModal({ isOpen: true, workflow });
+  };
+
+  const handleExecutionComplete = (result: any) => {
+    // Refresh workflows to update last run time
+    loadWorkflows();
+  };
+
+  const stats = workflowService.getWorkflowStats();
 
   const integrations = [
     { name: "Gmail", icon: Mail, status: "connected", color: "text-red-400" },
     { name: "Google Drive", icon: HardDrive, status: "connected", color: "text-blue-400" },
     { name: "GitHub", icon: Github, status: "connected", color: "text-gray-400" },
     { name: "Terminal", icon: Terminal, status: "available", color: "text-green-400" },
-  ];
-
-  const recentActivity = [
-    { action: "Downloaded 3 files from Gmail", time: "2 min ago", status: "success" },
-    { action: "Generated deployment script", time: "1 hour ago", status: "success" },
-    { action: "Organized 47 files in Drive", time: "2 hours ago", status: "success" },
-    { action: "Authentication failed for Gmail", time: "6 hours ago", status: "error" },
   ];
 
   return (
@@ -99,7 +115,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Active Workflows</p>
-                      <p className="text-3xl font-bold text-foreground">12</p>
+                      <p className="text-3xl font-bold text-foreground">{stats.activeWorkflows}</p>
                     </div>
                     <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
                       <Activity className="w-6 h-6 text-primary" />
@@ -113,7 +129,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Tasks Today</p>
-                      <p className="text-3xl font-bold text-foreground">47</p>
+                      <p className="text-3xl font-bold text-foreground">{stats.recentExecutions}</p>
                     </div>
                     <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
                       <Calendar className="w-6 h-6 text-primary" />
@@ -126,11 +142,11 @@ const Dashboard = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Time Saved</p>
-                      <p className="text-3xl font-bold text-foreground">2.4h</p>
+                      <p className="text-sm text-muted-foreground">Success Rate</p>
+                      <p className="text-3xl font-bold text-foreground">{stats.successRate}%</p>
                     </div>
                     <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-primary" />
+                      <CheckCircle2 className="w-6 h-6 text-primary" />
                     </div>
                   </div>
                 </CardContent>
@@ -143,7 +159,8 @@ const Dashboard = () => {
                 <CardTitle className="flex items-center justify-between">
                   <span>Active Workflows</span>
                   <Button variant="ghost" size="sm">
-                    View All
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    <a href="/recorder">Create New</a>
                   </Button>
                 </CardTitle>
                 <CardDescription>
@@ -151,36 +168,68 @@ const Dashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {workflows.map((workflow) => (
-                  <div key={workflow.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="font-semibold text-foreground">{workflow.name}</h3>
-                        <Badge variant={workflow.status === 'active' ? 'default' : 'secondary'}>
-                          {workflow.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">{workflow.description}</p>
-                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                        <span>Last run: {workflow.lastRun}</span>
-                        <span>•</span>
-                        <span>{workflow.frequency}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="ghost" size="icon">
-                        {workflow.status === 'active' ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
-                      </Button>
-                      <Button variant="ghost" size="icon">
-                        <Settings className="w-4 h-4" />
-                      </Button>
-                    </div>
+                {workflows.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No workflows created yet</p>
+                    <p className="text-sm">Record some actions to create your first workflow</p>
+                    <Button variant="outline" className="mt-3">
+                      <a href="/recorder" className="flex items-center">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Workflow
+                      </a>
+                    </Button>
                   </div>
-                ))}
+                ) : (
+                  workflows.map((workflow) => (
+                    <div key={workflow.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-border">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="font-semibold text-foreground">{workflow.name}</h3>
+                          <Badge variant={workflow.status === 'active' ? 'default' : 'secondary'}>
+                            {workflow.status}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {workflow.actions.length} actions
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">{workflow.description}</p>
+                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                          <span>Last run: {workflow.lastRun || 'Never'}</span>
+                          <span>•</span>
+                          <span>{workflow.frequency || 'Manual trigger'}</span>
+                          <span>•</span>
+                          <span>Services: {workflow.services.join(', ')}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => handleExecuteWorkflow(workflow)}
+                          disabled={workflow.actions.length === 0}
+                          title={workflow.actions.length === 0 ? 'No actions to execute' : 'Execute workflow'}
+                        >
+                          <Play className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleToggleWorkflow(workflow.id)}
+                        >
+                          {workflow.status === 'active' ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Button variant="ghost" size="icon">
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
@@ -219,19 +268,48 @@ const Dashboard = () => {
                 <CardDescription>Latest automation events</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 bg-muted/20 rounded-lg">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${activity.status === 'success' ? 'bg-green-400' : 'bg-red-400'}`} />
+                {workflowService.getExecutionHistory().slice(0, 4).map((execution, index) => (
+                  <div key={execution.id} className="flex items-start space-x-3 p-3 bg-muted/20 rounded-lg">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      execution.status === 'completed' ? 'bg-green-400' : 
+                      execution.status === 'failed' ? 'bg-red-400' : 
+                      'bg-blue-400'
+                    }`} />
                     <div className="flex-1">
-                      <p className="text-sm text-foreground">{activity.action}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+                      <p className="text-sm text-foreground">
+                        {execution.status === 'completed' ? 'Successfully executed' : 
+                         execution.status === 'failed' ? 'Failed to execute' :
+                         'Started executing'} workflow
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(execution.startTime).toLocaleTimeString()}
+                      </p>
                     </div>
                   </div>
                 ))}
+                
+                {workflowService.getExecutionHistory().length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No recent activity</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {/* Workflow Execution Modal */}
+        {executionModal.workflow && (
+          <WorkflowExecutionModal
+            isOpen={executionModal.isOpen}
+            onClose={() => setExecutionModal({ isOpen: false, workflow: null })}
+            workflowId={executionModal.workflow.id}
+            workflowName={executionModal.workflow.name}
+            actions={executionModal.workflow.actions}
+            onExecutionComplete={handleExecutionComplete}
+          />
+        )}
       </div>
     </div>
   );
