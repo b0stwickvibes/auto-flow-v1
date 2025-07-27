@@ -170,30 +170,57 @@ const MacroRecorder = () => {
     }
   }
   
-  // Listen for navigation events
+  // Enhanced navigation tracking for login flows
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
   
   history.pushState = function() {
     originalPushState.apply(history, arguments);
-    reinjectRecorder();
+    setTimeout(reinjectRecorder, 100);
   };
   
   history.replaceState = function() {
     originalReplaceState.apply(history, arguments);
-    reinjectRecorder();
+    setTimeout(reinjectRecorder, 100);
   };
   
-  window.addEventListener('popstate', reinjectRecorder);
+  window.addEventListener('popstate', () => setTimeout(reinjectRecorder, 100));
   
-  // Watch for page changes with MutationObserver
+  // Enhanced page change detection for login flows and iframes
   const observer = new MutationObserver(() => {
     if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
-      reinjectRecorder();
+      setTimeout(reinjectRecorder, 100);
     }
   });
   
   observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Watch for URL changes more aggressively (for SPAs and login redirects)
+  let currentUrl = window.location.href;
+  setInterval(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
+        setTimeout(reinjectRecorder, 200);
+      }
+    }
+  }, 500);
+  
+  // Handle iframe-based logins and modal overlays
+  window.addEventListener('focus', () => {
+    if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
+      setTimeout(reinjectRecorder, 100);
+    }
+  });
+  
+  // Watch for form submissions that might trigger redirects
+  document.addEventListener('submit', () => {
+    setTimeout(() => {
+      if (window.macroRecorderActive && !document.getElementById('macro-recorder-ui')) {
+        setTimeout(reinjectRecorder, 500);
+      }
+    }, 100);
+  }, true);
   
   // Enhanced selector generation
   function generateSelector(element) {
