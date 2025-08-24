@@ -72,12 +72,17 @@ const HeroSection = () => {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Button variant="glow" size="lg" className="group">
-                <a href="/recorder" className="flex items-center">
-                  Start Recording
+                <a href="/builder" className="flex items-center">
+                  Build Workflow
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </a>
               </Button>
               <Button variant="glass" size="lg">
+                <a href="/recorder" className="flex items-center">
+                  Start Recording
+                </a>
+              </Button>
+              <Button variant="outline" size="lg">
                 <a href="/?dashboard" className="flex items-center">
                   View Dashboard
                 </a>
